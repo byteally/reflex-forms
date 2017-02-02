@@ -33,7 +33,7 @@ class ToWidget a where
 instance ToWidget Text where
   toWidget wDef = do
     let def' = def
-                & textInputConfig_inputType .~ "number"
+                & textInputConfig_inputType .~ "text"
                 & attributes .~ constDyn ("class" =: "text-box")
         textDef = case wDef of
           Nothing -> def'
@@ -180,7 +180,7 @@ instance ToWidget a => ToWidget (Maybe a) where
       widget <- toWidget Nothing
       let checkboxDyn = _checkbox_value chk
       isActive <- toggle checkboxDefVal (updated checkboxDyn)
-      combineDyn (\a b -> fmap (\x -> if a then Just x else Nothing) b) isActive widget  
+      combineDyn (\a b -> fmap (\x -> if a then Just x else Nothing) b) isActive widget
 
 
 type DynamicAttr t = Dynamic t (Map String String)
@@ -194,7 +194,7 @@ data GToWidgetOpts t f a = GToWidgetOpts
   , widgetDefVal :: Maybe (f a)
   , arbitraryDef :: Maybe (Dynamic t (f a))
   }
-  
+
 class GToWidget f where
   gToWidget :: ( MonadWidget t m
                ) => GToWidgetOpts t f a -> m (Dynamic t (Maybe (f a)))
@@ -307,7 +307,7 @@ instance (GToWidget f, Selector s) => GToWidget (S1 s f) where
 instance (ToWidget f) => GToWidget (K1 c f) where
   gToWidget (GToWidgetOpts _ wDef _) =
     let wDef' = fmap (\(K1 a) -> a) wDef
-    in mapDyn (fmap K1) =<< toWidget wDef'               
+    in mapDyn (fmap K1) =<< toWidget wDef'
 
 
 class CtorInfo (f :: * -> *) where
