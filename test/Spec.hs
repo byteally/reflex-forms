@@ -4,6 +4,7 @@ import Reflex.Forms
 import Data.Time.Clock
 import Data.Time.Calendar
 import Data.Time.LocalTime
+import Data.Text (Text)
 import GHC.Generics
 
 data Colour = Red | Blue | Green
@@ -13,6 +14,7 @@ instance ToWidget Colour
 
 data Foo = Foo
   { intF :: Int
+  , txtF :: Text
   , locTime :: LocalTime
   , rgb :: Colour
   , days :: [Day]

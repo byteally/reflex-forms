@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric, DefaultSignatures, FlexibleContexts, TypeOperators, KindSignatures, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, GADTs, RecursiveDo #-}
+{-# LANGUAGE DeriveGeneric, DefaultSignatures, FlexibleContexts, TypeOperators, KindSignatures, TypeSynonymInstances, FlexibleInstances, ScopedTypeVariables, GADTs, RecursiveDo, OverloadedStrings #-}
 module Reflex.Forms
   ( ToWidget (..)
   )where
@@ -37,9 +37,9 @@ instance ToWidget Text where
                 & attributes .~ constDyn ("class" =: "text-box")
         textDef = case wDef of
           Nothing -> def'
-          Just a -> def' & textInputConfig_initialValue .~ T.unpack a
+          Just a -> def' & textInputConfig_initialValue .~ a
     txt <- textInput textDef
-    mapDyn (Just . T.pack) $ _textInput_value txt
+    mapDyn Just $ _textInput_value txt
 
 instance ToWidget Int where
   toWidget wDef = do
@@ -48,9 +48,9 @@ instance ToWidget Int where
                 & attributes .~ constDyn ("class" =: "text-box")
         intDef = case wDef of
           Nothing -> def'
-          Just a -> def' & textInputConfig_initialValue .~ show a
+          Just a -> def' & textInputConfig_initialValue .~ (T.pack $ show a)
     txt <- textInput intDef
-    mapDyn readMaybe $ _textInput_value txt
+    mapDyn (readMaybe . T.unpack) $ _textInput_value txt
 
 instance ToWidget Double where
   toWidget wDef = do
@@ -59,9 +59,9 @@ instance ToWidget Double where
                 & attributes .~ constDyn ("class" =: "text-box")
         doubleDef = case wDef of
           Nothing -> def'
-          Just a -> def' & textInputConfig_initialValue .~ show a
+          Just a -> def' & textInputConfig_initialValue .~ (T.pack $ show a)
     txt <- textInput doubleDef
-    mapDyn readMaybe $ _textInput_value txt
+    mapDyn (readMaybe . T.unpack) $ _textInput_value txt
 
 instance ToWidget Bool where
   toWidget wDef = do
@@ -76,9 +76,9 @@ instance ToWidget UTCTime where
   toWidget wDef = do
     let def' = def
                 & attributes .~ constDyn ("class" =: "text-box")
-        utcDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (formatUTC a)) wDef
+        utcDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (T.pack $ formatUTC a)) wDef
     txt <- textInput utcDef
-    mapDyn parseUTC $ _textInput_value txt
+    mapDyn (parseUTC . T.unpack) $ _textInput_value txt
 
 parseUTC :: String -> Maybe UTCTime
 parseUTC str = parseTimeM True defaultTimeLocale "%FT%T%QZ" str
@@ -113,27 +113,27 @@ instance ToWidget LocalTime where
     let def' = def
                 & textInputConfig_inputType .~ "datetime-local"
                 & attributes .~ (constDyn $ M.fromList [("class", "text-box"), ("step", "1")])
-        timeDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (formatLocalTime a)) wDef
+        timeDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (T.pack $ formatLocalTime a)) wDef
     txt <- textInput timeDef
-    mapDyn parseLocalTime $ _textInput_value txt
+    mapDyn (parseLocalTime . T.unpack) $ _textInput_value txt
 
 instance ToWidget Day where
   toWidget wDef = do
     let def' = def
                 & textInputConfig_inputType .~ "date"
                 & attributes .~ constDyn ("class" =: "text-box")
-        dayDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (formatDay a)) wDef
+        dayDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (T.pack $ formatDay a)) wDef
     txt <- textInput dayDef
-    mapDyn parseDay $ _textInput_value txt
+    mapDyn (parseDay . T.unpack) $ _textInput_value txt
 
 instance ToWidget TimeOfDay where
   toWidget wDef = do
     let def' = def
                 & textInputConfig_inputType .~ "time"
                 & attributes .~ (constDyn $ M.fromList [("class", "text-box"), ("step", "1")])
-        todDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (formatTimeOfDay a)) wDef
+        todDef = maybe def' (\a -> def' & textInputConfig_initialValue .~ (T.pack $ formatTimeOfDay a)) wDef
     txt <- textInput todDef
-    mapDyn parseTimeOfDay $ _textInput_value txt
+    mapDyn (parseTimeOfDay . T.unpack) $ _textInput_value txt
 
 instance ToWidget a => ToWidget [a] where
   toWidget _ = do
@@ -158,7 +158,7 @@ instance ToWidget a => ToWidget [a] where
           let addEvt = _el_clicked addEvtEl
       mapDyn (sequence . (map snd) . M.toList) modelD
     where
-      fn :: MonadSample t m => [Dynamic t (Maybe a)] -> m (Maybe [a])
+      fn :: (Reflex t, MonadSample t m) => [Dynamic t (Maybe a)] -> m (Maybe [a])
       fn = (\model -> do
         model' <- mapM (sample . current) model
         return $ sequence model'
@@ -183,7 +183,7 @@ instance ToWidget a => ToWidget (Maybe a) where
       combineDyn (\a b -> fmap (\x -> if a then Just x else Nothing) b) isActive widget
 
 
-type DynamicAttr t = Dynamic t (Map String String)
+type DynamicAttr t = Dynamic t (Map Text Text)
 
 data GToWidgetState t = GToWidgetState
   { st_constructors :: (Event t Text, Map Text (DynamicAttr t))
@@ -214,7 +214,7 @@ instance (GToWidget f, CtorInfo f) => GToWidget (D1 c f) where
     case ctorNames of
       (firstCtor:_:_) -> do  -- SumType
         divClass "sum-wrapper" $ do
-          let ctorNameMap = M.fromList $ map (\x -> (x, T.unpack x)) ctorNames
+          let ctorNameMap = M.fromList $ map (\x -> (x, x)) ctorNames
           dd <- dropdown firstCtor (constDyn ctorNameMap) $ def
           sumTyAttrMap <- (return . M.fromList) =<< mapM (\c -> do
             cDyn <- mapDyn (\ddVal -> if ddVal == c then ("class" =: "sum-ty active") else ("class" =: "sum-ty")) (_dropdown_value dd)
@@ -286,7 +286,7 @@ instance (GToWidget f, Typeable f, Constructor c) => GToWidget (C1 c f) where
         mapDyn (fmap M1) =<< (gToWidget gopts')
       _ -> do
         elClass "fieldset" "nested-field field" $ do
-          el "legend" $ text $ conName (undefined :: C1 c f ())
+          el "legend" $ text $ T.pack $ conName (undefined :: C1 c f ())
           divClass "field" $ mapDyn (fmap M1) =<< (gToWidget gopts')
 
 instance GToWidget U1 where
@@ -300,7 +300,7 @@ instance (GToWidget f, Selector s) => GToWidget (S1 s f) where
     let wDef' = fmap (\(M1 a) -> a) wDef
         gopts' = GToWidgetOpts Nothing wDef' Nothing
     elClass "div" "field" $ do
-      elAttr "label" ("class" =: "label") $ text $ selName (undefined :: S1 s f ())
+      elAttr "label" ("class" =: "label") $ text $ T.pack $ selName (undefined :: S1 s f ())
       inp <- gToWidget gopts'
       mapDyn (fmap M1) inp
 
