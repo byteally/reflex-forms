@@ -23,6 +23,4 @@ data Foo = Foo
 instance ToWidget Foo
 
 main :: IO ()
-main = mainWidget $ do
-  foo  <- toWidget (Nothing :: Maybe Foo)
-  display foo
+main = return ()
